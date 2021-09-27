@@ -1,0 +1,104 @@
+---
+- name: Config Web VM with Docker
+  hosts: webservers
+  become: true
+  become_user: root
+
+  tasks:
+    - name: apt update
+      apt:
+          update_cache: yes
+          name: "*"
+          state: latest
+
+    - name: docker.io
+      apt:
+        update_cache: yes
+        name: docker.io
+        state: present
+
+    - name: Install pip3
+      apt:
+        name: python3-pip
+        state: present
+
+    - name: Install Docker python module
+      pip:
+        name: docker
+        state: present
+
+    - name: download and launch a docker web container
+      docker_container:
+        name: dvwa
+        image: cyberxsecurity/dvwa
+        state: started
+        restart_policy: always
+        published_ports: 80:80
+
+    - name: download filebeat
+      get_url:
+          url: https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-7.6.1-amd64.deb
+          dest: /tmp/filebeat-7.6.1-amd64.deb
+
+    - name: install filebeat
+      apt: deb="/tmp/filebeat-7.6.1-amd64.deb"
+
+    - name: copy file beat config
+      copy:
+          src: ./files/filebeat-config.yml
+          dest: /etc/filebeat/filebeat.yml
+
+    - name: commands to run from filebeat
+      command: filebeat modules enable system
+
+    - name: commands to run from filebeat 2
+      command: filebeat setup
+
+      #    - name: commands to run from filebeat 3
+      #      command: filebeat -e
+
+
+    - name: download metricbeat
+      get_url:
+          url: https://artifacts.elastic.co/downloads/beats/metricbeat/metricbeat-7.6.1-amd64.deb
+          dest: /tmp/metricbeat-7.6.1-amd64.deb
+
+    - name: install metricbeat
+      apt: deb="/tmp/metricbeat-7.6.1-amd64.deb"
+
+    - name: copy metric beat config
+      copy:
+          src: ./files/metricbeat-config.yml
+          dest: /etc/metricbeat/metricbeat.yml
+
+    - name: Metricbeat enblae docker
+      command: metricbeat modules enable docker
+    
+      #    - name: Metric beat -e
+      #command: metricbeat setup -e
+
+    - name: Enable docker service
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+        
+      #    - name: start filebeat with service start
+      #      service: 
+      #          name: filebeat
+      #          enabled: yes
+      #          state: started
+
+
+    - name: Enable filebeat service
+      systemd:
+        name: filebeat
+        enabled: yes
+        state: started
+
+
+    - name: Enable metricbeat service
+      systemd:
+        name: metricbeat
+        enabled: yes
+        state: started
